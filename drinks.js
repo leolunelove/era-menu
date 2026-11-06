@@ -1,6 +1,23 @@
 // Source artwork is displayed unchanged; transparent buttons supply interactions.
 function drinkArt(box,label){const a=art(box,label);a.querySelector('img').src='drinks.png';return a}
-function panel(id,box,label,items=[]){const el=$(id);el.className+=' drink-panel';el.append(drinkArt(box,label));for(const item of items){const [name,price,rect,kind]=item,b=document.createElement('button');b.className='drink-hit';b.setAttribute('aria-label',name+' '+money(price));b.title=name+' · '+money(price);b.style.left=(rect[0]-box[0])/box[2]*100+'%';b.style.top=(rect[1]-box[1])/box[3]*100+'%';b.style.width=rect[2]/box[2]*100+'%';b.style.height=rect[3]/box[3]*100+'%';b.onclick=()=>kind?customizeDrink(name,price,kind):add(name,price);el.append(b)}}
+function panel(id, box, label, items = []) {
+  const element = $(id);
+  element.classList.add('drink-panel');
+  element.append(drinkArt(box, label));
+  for (const [name, price, rect, kind] of items) {
+    const button = document.createElement('button');
+    button.className = 'drink-hit';
+    button.setAttribute('aria-label', name + ' ' + money(price));
+    button.title = name + ' · ' + money(price);
+    button.style.left = (rect[0] - box[0]) / box[2] * 100 + '%';
+    button.style.top = (rect[1] - box[1]) / box[3] * 100 + '%';
+    button.style.width = rect[2] / box[2] * 100 + '%';
+    button.style.height = rect[3] / box[3] * 100 + '%';
+    button.onclick = () => kind ? customizeDrink(name, price, kind) : add(name, price);
+    element.append(button);
+    printedMenu.drinks.push({ name, price, box: rect, customizable: Boolean(kind), control: button });
+  }
+}
 panel('waterPanel',[0,77,420,1120],'H2O bar. £3.50. One glass, unlimited refills. Kiwi & cucumber, strawberry & lemonade, mango & passion fruit, watermelon & mint. Ultra-filtered water also available at the bar.',[
 ['Kiwi & cucumber',3.5,[26,345,164,290]],['Strawberry & lemonade',3.5,[227,345,167,290]],['Mango & passion fruit',3.5,[25,670,171,288]],['Watermelon & mint',3.5,[226,670,168,288]]]);
 panel('smoothiePanel',[420,77,786,536],'Smoothies. Full-size & freshly made. Only real ingredients.',[
@@ -15,16 +32,60 @@ panel('softPanel',[1206,740,682,230],'Soft drinks. A range of soft drinks availa
 panel('kombuchaPanel',[1206,970,682,227],'Kombucha. A rotating & curated selection. Ask our team.');
 panel('milkPanel',[0,1197,1888,137],'Make it custom. Choose your milk. Dairy included; oat, almond or coconut +50p. Caramel or vanilla syrup +95p each. Order at the counter or scan the QR code on your table.');
 const gluten=document.createElement('p');gluten.className='drinks-gluten';gluten.textContent='ALL DRINK SELECTION IS GLUTEN FREE';$('drinksFace').prepend(gluten);
-let showingDrinks=false,flipBusy=false;
-$('flipMenu').onclick=()=>{
- if(flipBusy)return;flipBusy=true;
- const button=$('flipMenu'),faces=$('menuFaces'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- button.setAttribute('aria-busy','true');
- const change=()=>{showingDrinks=!showingDrinks;$('foodFace').hidden=showingDrinks;$('drinksFace').hidden=!showingDrinks;button.querySelector('span').textContent=showingDrinks?'Food':'Drinks';button.setAttribute('aria-label','Flip menu to '+(showingDrinks?'food':'drinks'));$('faceStatus').textContent=(showingDrinks?'Drinks':'Food')+' side of the menu';window.scrollTo({top:0,behavior:'instant'})};
- const finish=()=>{flipBusy=false;button.removeAttribute('aria-busy')};
- if(reduced){change();finish();return}
- const out=faces.animate([{transform:'perspective(1800px) rotateY(0)',opacity:1},{transform:'perspective(1800px) rotateY(-85deg)',opacity:0}],{duration:170,easing:'ease-in',fill:'forwards'});
- out.finished.then(()=>{change();out.cancel();return faces.animate([{transform:'perspective(1800px) rotateY(85deg)',opacity:0},{transform:'perspective(1800px) rotateY(0)',opacity:1}],{duration:200,easing:'ease-out'}).finished}).then(finish).catch(finish);
+printedMenu.drinks.push(
+  { name: 'Ultra-filtered water', box: [27, 999, 365, 173], description: 'Cold, sparkling or room temperature. Available from the bar.' },
+  { name: 'Soft drinks', box: [1230, 764, 635, 192], description: 'Ask our team for the selection.' },
+  { name: 'Kombucha', box: [1230, 981, 635, 191], description: 'Ask our team for the rotating selection.' }
+);
+
+let showingDrinks = false;
+let flipBusy = false;
+let cafeMenu = null;
+const reducedMenuMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+function setMenuSide(drinks) {
+  showingDrinks = drinks;
+  $('foodFace').hidden = drinks;
+  $('drinksFace').hidden = !drinks;
+  $('flipMenu').querySelector('span').textContent = drinks ? 'Food' : 'Drinks';
+  $('flipMenu').setAttribute('aria-label', 'Flip menu to ' + (drinks ? 'food' : 'drinks'));
+  $('faceStatus').textContent = (drinks ? 'Drinks' : 'Food') + ' side of the menu';
+  cafeMenu?.showSide(drinks);
+  if (!cafeMenu?.active) window.scrollTo(0, 0);
+}
+
+$('flipMenu').onclick = async () => {
+  if (flipBusy) return;
+  flipBusy = true;
+  const button = $('flipMenu');
+  button.setAttribute('aria-busy', 'true');
+  const next = !showingDrinks;
+  const change = () => setMenuSide(next);
+  try {
+    if (cafeMenu?.active) {
+      await cafeMenu.flip(change);
+    } else if (reducedMenuMotion.matches || !$('menuFaces').animate) {
+      change();
+    } else {
+      const faces = $('menuFaces');
+      const turn = faces.animate([
+        { transform: 'perspective(1800px) rotateY(0)', opacity: 1 },
+        { transform: 'perspective(1800px) rotateY(-85deg)', opacity: 0 }
+      ], { duration: 170, easing: 'ease-in', fill: 'forwards' });
+      await turn.finished;
+      change();
+      turn.cancel();
+      await faces.animate([
+        { transform: 'perspective(1800px) rotateY(85deg)', opacity: 0 },
+        { transform: 'perspective(1800px) rotateY(0)', opacity: 1 }
+      ], { duration: 200, easing: 'ease-out' }).finished;
+    }
+  } catch {
+    if (showingDrinks !== next) change();
+  } finally {
+    flipBusy = false;
+    button.removeAttribute('aria-busy');
+  }
 };
 function customizeDrink(name,base,kind){
  const d=document.createElement('dialog');d.className='drink-options';

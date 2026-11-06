@@ -1,7 +1,52 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>era. — Food & drinks</title><meta name="description" content="Explore the era. menu. Choose your protein, two sides and a sauce, and build your order for the counter."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1708'/%3E%3Ctext x='12' y='46' font-family='Arial' font-weight='900' font-size='48' fill='%23faf4e9'%3Ee%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=20261009-3"></head><body>
-<header><a href="#" aria-label="era. home" id="logo"></a><p>ORDER AT THE COUNTER OR SCAN<br>THE QR CODE ON YOUR TABLE</p><button id="flipMenu" class="bag flip" aria-controls="foodFace drinksFace" aria-label="Flip menu to drinks">↻ <span>Drinks</span></button><button id="reviewTop" class="bag">Your order <span id="count">0</span></button></header>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>era. — Food & drinks</title><meta name="description" content="Explore the era. menu. Choose your protein, two sides and a sauce, and build your order for the counter."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1708'/%3E%3Ctext x='12' y='46' font-family='Arial' font-weight='900' font-size='48' fill='%23faf4e9'%3Ee%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=20261009-3"><link rel="stylesheet" href="cafe.css?v=20261106-1"></head><body>
+<header>
+  <a href="#" aria-label="era. home" id="logo"></a>
+  <p>ORDER AT THE COUNTER OR SCAN<br>THE QR CODE ON YOUR TABLE</p>
+  <button id="menuViewToggle" class="bag" type="button" aria-controls="menuFaces cafeView" hidden>Café view</button>
+  <button id="flipMenu" class="bag flip" type="button" aria-controls="foodFace drinksFace cafeView" aria-label="Flip menu to drinks">↻ <span>Drinks</span></button>
+  <button id="reviewTop" class="bag" type="button">Your order <span id="count">0</span></button>
+</header>
+<section id="cafeView" class="cafe-view" aria-label="Café menu" hidden>
+  <div id="cafeStage" class="cafe-stage">
+    <div class="cafe-room" aria-hidden="true"></div>
+    <div id="cafeFrame" class="cafe-frame">
+      <div id="cafeRig" class="cafe-rig" aria-hidden="true">
+        <div id="cafeLeaf" class="cafe-leaf">
+          <img id="cafeFoodArt" src="menu.png" alt="" decoding="async" draggable="false">
+          <img id="cafeDrinksArt" src="drinks.png" alt="" decoding="async" draggable="false" hidden>
+          <div id="cafeSelections" class="cafe-selections"></div>
+          <div id="cafeRing" class="cafe-ring" hidden></div>
+        </div>
+        <div id="cafeLeftHand" class="cafe-hand cafe-hand-left"><div class="cafe-grip"></div></div>
+        <div id="cafeRightHand" class="cafe-hand cafe-hand-right"><div class="cafe-grip"></div></div>
+      </div>
+      <div id="cafeFoodTargets" class="cafe-targets" role="group" aria-label="Food items"></div>
+      <div id="cafeDrinksTargets" class="cafe-targets" role="group" aria-label="Drink items" hidden></div>
+    </div>
+    <button id="cafeZoomOut" class="cafe-back" type="button" hidden>← Full menu</button>
+    <div class="cafe-dock">
+      <p id="cafeGuide" class="cafe-guide">Hover to lean in · Click to hold</p>
+      <div id="cafeDetail" class="cafe-detail" hidden>
+        <div class="cafe-detail-copy">
+          <h2><span id="cafeItemName"></span> <span id="cafeItemPrice" class="cafe-price"></span></h2>
+          <p id="cafeItemDescription"></p>
+        </div>
+        <button id="cafeItemAction" class="cafe-action" type="button"></button>
+      </div>
+      <div id="cafePlate" class="cafe-plate" hidden>
+        <p><strong>Your plate</strong><span id="cafePlateProgress"></span></p>
+        <button id="cafeAddPlate" class="cafe-action" type="button" disabled>Add plate</button>
+      </div>
+    </div>
+  </div>
+  <p id="cafeStatus" class="sr-only" role="status" aria-live="polite"></p>
+</section>
 <div id="menuFaces"><div id="foodFace"><main><section class="plate" aria-label="Create your plate"><div id="plateTitle" class="title"></div><p class="guide">Tap to choose your protein, two sides and a sauce.</p><div id="proteinTitle" class="step"></div><div id="proteins" class="grid proteins"></div><div id="sideTitle" class="step"></div><div id="sides" class="grid sides"></div><div id="sauceTitle" class="step"></div><div id="sauces" class="grid sauces"></div><div class="plateAction"><p id="progress" aria-live="polite">Choose your protein</p><button id="addPlate" disabled>Add plate</button></div></section>
 <section class="other" aria-label="Starters and desserts"><div class="starters"><div id="starterTitle" class="title"></div><div id="starters" class="grid starterGrid"></div></div><div id="sweetTitle" class="title sweetTitle"></div><div id="sweets" class="grid sweetGrid"></div><p class="legend"><b>V</b> VEGETARIAN <b>VG</b> VEGAN <b>GF</b> GLUTEN FREE</p><p class="nut">ALL FOOD OPTIONS CURRENTLY NUT FREE.</p></section></main>
 <footer><h2>MAKE IT YOURS.<br>ADD SOME EXTRAS</h2><div><h3>✚ EXTRA PROTEIN</h3><div id="extraProteins" class="extraGrid"></div></div><div><h3>✚ EXTRA SAUCE <small>£1.90 each</small></h3><div id="extraSauces" class="extraGrid"></div></div></footer></div><section id="drinksFace" aria-label="Drinks menu" hidden><div class="drinks-layout"><div id="waterPanel"></div><div class="drinks-center"><div id="smoothiePanel"></div><div id="matchaPanel"></div></div><div class="drinks-right"><div class="hot-drinks"><div id="coffeePanel"></div><div id="teaPanel"></div></div><div id="softPanel"></div><div id="kombuchaPanel"></div></div></div><div id="milkPanel"></div></section></div><p id="faceStatus" class="sr-only" role="status" aria-live="polite"></p>
 <div class="orderbar" id="orderbar" hidden><span id="barText"></span><button id="review">Review order <span id="total"></span></button></div><div id="toast" role="status"></div>
-<dialog id="order"><div class="dialogHead"><h2>Your order</h2><button id="close" aria-label="Close order">×</button></div><p class="counterNote">Show your selection at the counter to order.</p><div id="lines"></div><div class="sum"><strong>Total</strong><strong id="dialogTotal"></strong></div><button id="done">Back to menu</button></dialog><script src="app.js?v=20261009-3"></script><script src="drinks.js?v=20261009-3"></script></body></html>
+<dialog id="order"><div class="dialogHead"><h2>Your order</h2><button id="close" aria-label="Close order">×</button></div><p class="counterNote">Show your selection at the counter to order.</p><div id="lines"></div><div class="sum"><strong>Total</strong><strong id="dialogTotal"></strong></div><button id="done">Back to menu</button></dialog>
+<script src="app.js?v=20261106-1"></script>
+<script src="drinks.js?v=20261106-1"></script>
+<script src="cafe.js?v=20261106-1"></script>
+</body></html>
