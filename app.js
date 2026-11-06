@@ -1,6 +1,13 @@
 const $=id=>document.getElementById(id),money=n=>'£'+n.toFixed(2);
 const printedMenu = { food: [], drinks: [] };
-function art([x,y,w,h],label=''){const s=document.createElement('span');s.className='sprite';s.style.aspectRatio=w+'/'+h;const i=document.createElement('img');i.src='menu.png';i.alt=label;i.style.width=(1888/w*100)+'%';i.style.left=(-x/w*100)+'%';i.style.top=(-y/h*100)+'%';i.draggable=false;s.append(i);return s}
+const menuArt = { food: 'food-paper.webp', drinks: 'drinks-paper.webp' };
+const orderMode = !$('readerSides') || new URLSearchParams(location.search).get('view') === 'order';
+document.documentElement.dataset.menuPurpose = orderMode ? 'order' : 'browse';
+if (orderMode && $('readerSides')) {
+  $('readerSides').hidden = true;
+  for (const id of ['orderInstructions', 'backToReader', 'flipMenu', 'reviewTop']) $(id).hidden = false;
+}
+function art([x,y,w,h],label='',source=menuArt.food){const s=document.createElement('span');s.className='sprite';s.style.aspectRatio=w+'/'+h;const i=document.createElement('img');i.src=source;i.alt=label;i.style.width=(1888/w*100)+'%';i.style.left=(-x/w*100)+'%';i.style.top=(-y/h*100)+'%';i.draggable=false;s.append(i);return s}
 const data={protein:[['Chicken breast',10.5,[72,248,171,265],'Lean, flame-grilled with a smoky finish.'],['Chicken thigh',10.5,[270,248,173,265],'Juicy, chargrilled with golden, smoky edges.'],['Steak',12.9,[470,245,171,268],'Grilled, seasoned and sliced with sea salt.'],['Secreto Ibérico',12.5,[663,248,173,265],'Tender, rich and full of chargrilled flavour.'],['Halloumi',11.9,[178,519,185,268],'Grilled with a golden, crispy crust. Vegetarian.'],['Falafel',9.5,[376,519,179,268],'Crispy outside with a soft, herby centre. Vegan.'],['Tofu',9.5,[573,519,179,268],'Golden-seared with a delicate, crispy edge. Vegan.']],side:[['Salad mix',0,[265,859,120,152],'Fresh & crisp. Vegetarian, gluten free. Vegan upon request.'],['Sourdough bread',0,[391,859,150,152],'Warm & crusty. Vegan.'],['Lemon quinoa',0,[551,859,124,152],'Zesty & fresh. Gluten free.']],sauce:[['Lemon & herb',0,[81,1073,112,108],'Cool & zesty. Vegetarian, gluten free.'],['Hot honey piri piri',0,[203,1073,134,108],'Sweet & spicy.'],['Harissa',0,[352,1073,108,108],'Smoky & spicy. Vegan, gluten free.'],['Chimichurri',0,[475,1073,109,108],'Fresh & herby. Vegan, gluten free.'],['Tahini',0,[594,1073,114,108],'Creamy & nutty. Vegan, gluten free.'],['Beetroot ketchup',0,[720,1073,139,108],'Earthy & tangy. Vegan, gluten free.']],starter:[['Chupadedo olives',2.9,[1057,196,162,280],'Marinated with garlic and fresh herbs. Vegan, gluten free.'],['Signature sweet potato fries',7.5,[1238,196,192,280],'Crispy, golden and served with homemade dips. Vegetarian, gluten free. Vegan upon request.'],['Falafel bites, tahini & chimichurri',6.9,[1430,196,210,280],'Crispy bites with tahini and fresh chimichurri. Vegan, gluten free.'],['Homemade hummus',5.9,[1648,196,171,280],'Silky, creamy with warm, fragrant spices. Vegan.'],['Sourdough bread + choice of dip',3.9,[1138,482,196,280],'Crusty pieces served with your choice of dip. Vegan.'],['Grilled halloumi + dip',6.9,[1349,482,178,280],'Golden grilled pieces with your choice of dip. Vegetarian, gluten free.'],['Vegetable crisps',3.9,[1532,482,196,280],'Light, crunchy selection of crisp vegetables. Vegan, gluten free.']],sweet:[['Banana bread',4.9,[1080,925,205,196],'Soft, moist with a caramelised banana top. Vegetarian, gluten free.'],['Basque cheesecake',5.9,[1308,925,215,196],'Rich, creamy with burnt exterior. Vegetarian, gluten free.']]};
 [['logo',[40,20,80,37],'era.'],['plateTitle',[244,98,456,82],'Create your plate. 1 protein + 2 sides + 1 sauce.'],['proteinTitle',[357,201,229,44],'01 Start with protein'],['sideTitle',[380,798,182,43],'02 Add two sides'],['sauceTitle',[412,1010,115,43],'Sauces'],['starterTitle',[1233,130,361,52],'Starters & sharers'],['sweetTitle',[1282,832,264,64],'Something sweet']].forEach(([id,box,label])=>$(id).append(art(box,label)));
 let selection={protein:null,side:[],sauce:null},cart=[];let toastTimer;
@@ -11,12 +18,18 @@ function add(name,price,detail=''){cart.push({name,price,detail});renderCart();t
 for (const [kind, id] of [['protein', 'proteins'], ['side', 'sides'], ['sauce', 'sauces'], ['starter', 'starters'], ['sweet', 'sweets']]) {
   data[kind].forEach((item, index) => {
     const [name, price, box, description] = item;
-    const button = document.createElement('button');
+    const button = document.createElement(orderMode ? 'button' : 'article');
     const plateKind = ['protein', 'side', 'sauce'].includes(kind) ? kind : null;
     const customizable = kind === 'starter' && (index === 4 || index === 5);
-    button.className = 'card';
-    button.setAttribute('aria-label', `${name}${price ? ' ' + money(price) : ''}. ${description}`);
-    button.append(art(box));
+    const label = `${name}${price ? ' ' + money(price) : ''}. ${description}`;
+    button.className = orderMode ? 'card' : 'card menu-static';
+    if (orderMode) button.setAttribute('aria-label', label);
+    button.append(art(box, orderMode ? '' : label));
+    if (!orderMode) {
+      $(id).append(button);
+      printedMenu.food.push({ name, price, box, description });
+      return;
+    }
     if (plateKind) {
       button.dataset.kind = kind;
       button.dataset.index = index;
@@ -35,9 +48,10 @@ const coming=art([1550,942,203,159],'With more to come. Something sweet…');com
 data.protein.forEach(([protein], index) => {
   const price = [6.9, 6.9, 7.9, 7.9, 6.9, 5.9, 5.9][index];
   const name = 'Extra ' + protein;
-  const button = document.createElement('button');
-  button.innerHTML = `<span>${protein}</span><b>${money(price)} +</b>`;
-  button.onclick = () => add(name, price);
+  const button = document.createElement(orderMode ? 'button' : 'div');
+  button.className = 'menu-line';
+  button.innerHTML = `<span>${protein}</span><b>${money(price)}${orderMode ? ' +' : ''}</b>`;
+  if (orderMode) button.onclick = () => add(name, price);
   $('extraProteins').append(button);
   const box = index < 4 ? [573, 1218 + index * 24, 240, 23] : [832, 1218 + (index - 4) * 24, 236, 23];
   printedMenu.food.push({ name, price, box, control: button });
@@ -45,9 +59,10 @@ data.protein.forEach(([protein], index) => {
 ['Lemon & herb', 'Hot honey piri piri', 'Harissa', 'Chimichurri', 'Tahini', 'Falafel', 'Beetroot ketchup'].forEach((sauce, index) => {
   const name = 'Extra ' + sauce;
   const price = 1.9;
-  const button = document.createElement('button');
-  button.textContent = sauce + ' +';
-  button.onclick = () => add(name, price);
+  const button = document.createElement(orderMode ? 'button' : 'div');
+  button.className = 'menu-line';
+  button.textContent = sauce + (orderMode ? ' +' : '');
+  if (orderMode) button.onclick = () => add(name, price);
   $('extraSauces').append(button);
   const box = index < 4 ? [1341, 1218 + index * 24, 170, 23] : [1511, 1218 + (index - 4) * 24, 176, 23];
   printedMenu.food.push({ name, price, box, control: button });
@@ -55,7 +70,7 @@ data.protein.forEach(([protein], index) => {
 $('addPlate').onclick=()=>{if($('addPlate').disabled)return;const p=data.protein[selection.protein];add(p[0]+' plate',p[1],selection.side.map(i=>data.side[i][0]).join(' + ')+' · '+data.sauce[selection.sauce][0]);selection={protein:null,side:[],sauce:null};renderSelection()};
 function renderCart(){const total=cart.reduce((n,x)=>n+x.price,0);$('count').textContent=cart.length;$('orderbar').hidden=!cart.length;$('barText').textContent=cart.length+' '+(cart.length===1?'item':'items')+' in your order';$('total').textContent=money(total);$('dialogTotal').textContent=money(total);$('lines').replaceChildren();if(!cart.length)$('lines').textContent='Your order is empty. Choose a plate or something to share.';cart.forEach((item,i)=>{const el=document.createElement('div');el.className='line';const content=document.createElement('div');const name=document.createElement('strong');name.textContent=item.name;content.append(name);if(item.detail){const detail=document.createElement('small');detail.textContent=item.detail;content.append(detail)}const remove=document.createElement('button');remove.className='remove';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+item.name);remove.onclick=()=>{cart.splice(i,1);renderCart();const next=$('lines').querySelectorAll('.remove');(next[Math.min(i,next.length-1)]||$('done')).focus({preventScroll:true})};content.append(remove);const price=document.createElement('strong');price.textContent=money(item.price);el.append(content,price);$('lines').append(el)})}
 for(const id of ['review','reviewTop'])$(id).onclick=()=>{openDialog($('order'))};for(const id of ['close','done'])$(id).onclick=()=>$('order').close();renderCart();
-if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'configure_plate',description:'Select a protein, two distinct sides and a sauce. Stages a plate without adding it to the order.',inputSchema:{type:'object',properties:{protein:{type:'string'},sides:{type:'array',items:{type:'string'},minItems:2,maxItems:2},sauce:{type:'string'}},required:['protein','sides','sauce'],additionalProperties:false},annotations:{readOnlyHint:false},execute(input){const p=data.protein.findIndex(x=>x[0]===input.protein),s=data.sauce.findIndex(x=>x[0]===input.sauce),sides=Array.isArray(input.sides)?input.sides.map(n=>data.side.findIndex(x=>x[0]===n)):[];if(p<0||s<0||sides.length!==2||sides.some(i=>i<0)||new Set(sides).size!==2)throw Error('Choose valid menu names and two distinct sides.');selection={protein:p,side:sides,sauce:s};renderSelection();return{ready:true,price:data.protein[p][1]}}})).catch(()=>{})}catch{}}
+if(orderMode&&document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'configure_plate',description:'Select a protein, two distinct sides and a sauce. Stages a plate without adding it to the order.',inputSchema:{type:'object',properties:{protein:{type:'string'},sides:{type:'array',items:{type:'string'},minItems:2,maxItems:2},sauce:{type:'string'}},required:['protein','sides','sauce'],additionalProperties:false},annotations:{readOnlyHint:false},execute(input){const p=data.protein.findIndex(x=>x[0]===input.protein),s=data.sauce.findIndex(x=>x[0]===input.sauce),sides=Array.isArray(input.sides)?input.sides.map(n=>data.side.findIndex(x=>x[0]===n)):[];if(p<0||s<0||sides.length!==2||sides.some(i=>i<0)||new Set(sides).size!==2)throw Error('Choose valid menu names and two distinct sides.');selection={protein:p,side:sides,sauce:s};renderSelection();return{ready:true,price:data.protein[p][1]}}})).catch(()=>{})}catch{}}
 
 function chooseDip(item,doubleAvailable){const d=document.createElement('dialog');d.innerHTML=`<form method="dialog"><div class="dialogHead"><h2>Choose your dip</h2><button value="cancel" aria-label="Cancel">×</button></div><p>${item[0]}</p><label for="dip">Dip</label><select id="dip" required><option value="">Choose a sauce</option>${data.sauce.map(x=>`<option>${x[0]}</option>`).join('')}</select>${doubleAvailable?'<label class="double"><input id="double" type="checkbox"> Double portion + £3.90</label>':''}<button class="confirmDip" value="add">Add to order</button></form>`;document.body.append(d);d.querySelector('[value="cancel"]').formNoValidate=true;d.addEventListener('close',()=>{if(d.returnValue==='add'){const doubled=d.querySelector('#double')?.checked;add(item[0],item[1]+(doubled?3.9:0),d.querySelector('#dip').value+(doubled?' · Double portion':''))}d.remove()});openDialog(d)}
 

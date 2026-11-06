@@ -1,10 +1,15 @@
 // Source artwork is displayed unchanged; transparent buttons supply interactions.
-function drinkArt(box,label){const a=art(box,label);a.querySelector('img').src='drinks.png';return a}
+function drinkArt(box, label) { return art(box, label, menuArt.drinks); }
 function panel(id, box, label, items = []) {
   const element = $(id);
   element.classList.add('drink-panel');
-  element.append(drinkArt(box, label));
+  const readableLabel = orderMode ? label : [label, ...items.map(([name, price]) => `${name}, ${money(price)}.`)].join(' ');
+  element.append(drinkArt(box, readableLabel));
   for (const [name, price, rect, kind] of items) {
+    if (!orderMode) {
+      printedMenu.drinks.push({ name, price, box: rect });
+      continue;
+    }
     const button = document.createElement('button');
     button.className = 'drink-hit';
     button.setAttribute('aria-label', name + ' ' + money(price));
@@ -40,7 +45,7 @@ printedMenu.drinks.push(
 
 let showingDrinks = false;
 let flipBusy = false;
-let cafeMenu = null;
+let menuReader = null;
 const reducedMenuMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 function setMenuSide(drinks) {
@@ -50,21 +55,23 @@ function setMenuSide(drinks) {
   $('flipMenu').querySelector('span').textContent = drinks ? 'Food' : 'Drinks';
   $('flipMenu').setAttribute('aria-label', 'Flip menu to ' + (drinks ? 'food' : 'drinks'));
   $('faceStatus').textContent = (drinks ? 'Drinks' : 'Food') + ' side of the menu';
-  cafeMenu?.showSide(drinks);
-  if (!cafeMenu?.active) window.scrollTo(0, 0);
+  $('foodSide')?.setAttribute('aria-pressed', String(!drinks));
+  $('drinksSide')?.setAttribute('aria-pressed', String(drinks));
+  document.dispatchEvent(new Event('era:sidechange'));
+  if (!menuReader?.active) window.scrollTo(0, 0);
 }
 
-$('flipMenu').onclick = async () => {
-  if (flipBusy) return;
+async function requestMenuSide(next) {
+  if (flipBusy || showingDrinks === next) return;
   flipBusy = true;
-  const button = $('flipMenu');
-  button.setAttribute('aria-busy', 'true');
-  const next = !showingDrinks;
+  const controls = orderMode ? $('flipMenu') : $('readerSides');
+  controls.setAttribute('aria-busy', 'true');
   const change = () => setMenuSide(next);
   try {
-    if (cafeMenu?.active) {
-      await cafeMenu.flip(change);
-    } else if (reducedMenuMotion.matches || !$('menuFaces').animate) {
+    if (menuReader?.active) {
+      await menuReader.turn(next);
+      change();
+    } else if (!orderMode || reducedMenuMotion.matches || !$('menuFaces').animate) {
       change();
     } else {
       const faces = $('menuFaces');
@@ -84,9 +91,14 @@ $('flipMenu').onclick = async () => {
     if (showingDrinks !== next) change();
   } finally {
     flipBusy = false;
-    button.removeAttribute('aria-busy');
+    controls.removeAttribute('aria-busy');
   }
-};
+}
+$('flipMenu').onclick = () => requestMenuSide(!showingDrinks);
+if (!orderMode) {
+  $('foodSide').onclick = () => requestMenuSide(false);
+  $('drinksSide').onclick = () => requestMenuSide(true);
+}
 function customizeDrink(name,base,kind){
  const d=document.createElement('dialog');d.className='drink-options';
  const hasMilk=!['Espresso','Americano'].includes(name);
