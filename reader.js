@@ -24,6 +24,9 @@
   const toggle = $('readerViewToggle');
   const back = $('readerBack');
   const detail = $('readerDetail');
+  const heading = $('readerName');
+  const artwork = $('readerArtwork');
+  const entries = $('readerEntries');
   const hint = $('tableHint');
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
   let scene;
@@ -33,7 +36,6 @@
   let hoverTimer;
   let returnTimer;
   let busy = false;
-  let cameraTask = 0;
   let targets = [];
 
   const sideKey = () => showingDrinks ? 'drinks' : 'food';
@@ -46,12 +48,10 @@
   function updateHint() {
     if (!scene) {
       hint.textContent = 'Opening the menu…';
-    } else if (section) {
-      hint.textContent = 'Select an item to read it up close';
     } else if (finePointer.matches && !reducedMenuMotion.matches) {
-      hint.textContent = 'Hover to peek · Click to read';
+      hint.textContent = 'Hover to tilt · Click to read';
     } else {
-      hint.textContent = 'Select an item to read it up close';
+      hint.textContent = 'Select an item to read';
     }
   }
 
@@ -64,38 +64,46 @@
   function describe() {
     const subject = item?.entry || section?.group;
     detail.hidden = !subject;
-    back.hidden = !subject;
-    hint.hidden = Boolean(item);
+    hint.hidden = Boolean(subject);
+    artwork.hidden = !item;
+    entries.hidden = Boolean(item) || !section;
+    artwork.replaceChildren();
     if (subject) {
-      $('readerName').textContent = subject.name;
+      heading.textContent = subject.name;
       $('readerPrice').textContent = subject.price ? money(subject.price) : '';
       $('readerDescription').textContent = subject.description || '';
       back.textContent = item && section ? `← ${section.group.name}` : '← Full menu';
     }
-    stage.dataset.reading = item ? 'item' : section ? 'section' : 'whole';
+    if (item) {
+      const [, , width, height] = item.entry.box;
+      const preview = art(item.entry.box, '', menuArt[sideKey()]);
+      preview.style.maxWidth = `${Math.min(286, 252 * width / height)}px`;
+      artwork.append(preview);
+    }
     updateHint();
     markSection();
+    for (const target of targets) {
+      target.button.setAttribute('aria-current', String(target.entry === item?.entry));
+    }
   }
 
-  function insideSection([x, y, width, height]) {
-    if (!section) return true;
-    const [left, top, spanX, spanY] = section.group.box;
+  function insideSection([x, y, width, height], group) {
+    const [left, top, spanX, spanY] = group.box;
     const centerX = x + width / 2;
     const centerY = y + height / 2;
     return centerX >= left && centerX <= left + spanX && centerY >= top && centerY <= top + spanY;
   }
 
   function positionTargets() {
-    hits.inert = !scene || table.hidden || Boolean(item) || busy;
+    hits.inert = !scene || table.hidden || busy;
     if (hits.inert) return;
     for (const target of targets) {
       const { button, entry } = target;
-      const points = scene.projectBox(entry.box, Boolean(section));
+      const points = scene.projectBox(entry.box);
       const left = Math.min(...points.map(point => point[0]));
       const top = Math.min(...points.map(point => point[1]));
       const right = Math.max(...points.map(point => point[0]));
       const bottom = Math.max(...points.map(point => point[1]));
-      button.hidden = !insideSection(entry.box) || right <= 0 || bottom <= 0 || left >= stage.clientWidth || top >= stage.clientHeight;
       button.style.left = `${left}px`;
       button.style.top = `${top}px`;
       button.style.width = `${right - left}px`;
@@ -104,18 +112,25 @@
     }
   }
 
-  async function moveReader(mode, box, restoreFocus) {
-    const task = ++cameraTask;
-    clearHover();
-    busy = true;
-    hits.inert = true;
-    describe();
-    if (mode === 'item') back.focus({ preventScroll: true });
-    await scene.focus(mode, box);
-    if (task !== cameraTask) return;
-    busy = false;
-    positionTargets();
-    if (restoreFocus?.isConnected) restoreFocus.focus({ preventScroll: true });
+  function renderEntries(group) {
+    const rows = printedMenu[sideKey()].filter(entry => insideSection(entry.box, group)).map(entry => {
+      const row = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      const name = document.createElement('span');
+      name.textContent = entry.name;
+      button.append(name);
+      if (entry.price) {
+        const price = document.createElement('span');
+        price.className = 'reader-entry-price';
+        price.textContent = money(entry.price);
+        button.append(price);
+      }
+      button.addEventListener('click', () => showItem(entry, button));
+      row.append(button);
+      return row;
+    });
+    entries.replaceChildren(...rows);
   }
 
   function showSection(group, trigger) {
@@ -126,27 +141,32 @@
     if (!scene || flipBusy) return;
     section = { group, trigger };
     item = null;
-    void moveReader('section', group.box);
+    renderEntries(group);
+    openReading();
   }
 
-  function showItem(target) {
-    if (!scene || busy || flipBusy || item) return;
-    item = target;
-    void moveReader('item', target.entry.box);
-    $('faceStatus').textContent = `Reading ${target.entry.name}${target.entry.price ? ', ' + money(target.entry.price) : ''}`;
+  function showItem(entry, trigger) {
+    if (!scene || busy || flipBusy) return;
+    if (section && !insideSection(entry.box, section.group)) section = null;
+    item = { entry, trigger };
+    openReading();
+  }
+
+  function openReading() {
+    clearHover();
+    void scene.focus('whole');
+    describe();
+    detail.scrollTop = 0;
+    heading.focus();
   }
 
   function backOneLevel() {
     if (!scene || flipBusy) return;
-    const previousItem = item;
-    const previousSection = section;
-    item = null;
-    if (previousItem && previousSection) {
-      void moveReader('section', previousSection.group.box, previousItem.button);
-      return;
-    }
-    section = null;
-    void moveReader('whole', null, previousItem?.button || previousSection?.trigger);
+    const trigger = item?.trigger || section?.trigger;
+    if (item) item = null;
+    else section = null;
+    describe();
+    trigger?.focus();
   }
 
   function makeTargets() {
@@ -166,7 +186,7 @@
         if (!scene || busy || item || section) return;
         returnTimer = setTimeout(() => { void scene.focus('whole'); }, 80);
       });
-      button.addEventListener('click', () => showItem(target));
+      button.addEventListener('click', () => showItem(entry, button));
       return target;
     });
     hits.replaceChildren(...targets.map(({ button }) => button));
@@ -191,7 +211,6 @@
   }
 
   function showFlat() {
-    cameraTask += 1;
     clearHover();
     busy = false;
     item = null;
@@ -202,7 +221,7 @@
     $('readerSecondary').hidden = false;
     document.documentElement.dataset.readerView = 'flat';
     toggle.textContent = '3D view';
-    markSection();
+    describe();
     window.scrollTo(0, 0);
   }
 
@@ -222,7 +241,7 @@
     window.scrollTo(0, 0);
     updateHint();
     try {
-      loading ||= import('./table-scene.js?v=20261106-3').then(({ createTableScene }) => createTableScene({
+      loading ||= import('./table-scene.js?v=20261106-4').then(({ createTableScene }) => createTableScene({
         mount: $('tableCanvas'), images: menuArt, motion: reducedMenuMotion, contextLost: unavailable
       }));
       scene = await loading;
@@ -239,7 +258,6 @@
   menuReader = {
     get active() { return Boolean(scene) && !table.hidden; },
     async turn(drinks) {
-      cameraTask += 1;
       clearHover();
       busy = true;
       section = null;

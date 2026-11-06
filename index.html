@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>era. — Food & drinks</title><meta name="description" content="Explore both sides of the era. food and drinks menu at the café table."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1708'/%3E%3Ctext x='12' y='46' font-family='Arial' font-weight='900' font-size='48' fill='%23faf4e9'%3Ee%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=20261009-3"><link rel="stylesheet" href="reader.css?v=20261106-3"></head><body>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>era. — Food & drinks</title><meta name="description" content="Explore both sides of the era. food and drinks menu at the café table."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1708'/%3E%3Ctext x='12' y='46' font-family='Arial' font-weight='900' font-size='48' fill='%23faf4e9'%3Ee%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=20261009-3"><link rel="stylesheet" href="reader.css?v=20261106-4"></head><body>
 <header class="reader-header">
   <a href="./" aria-label="era. menu" id="logo"></a>
   <div id="readerSides" class="reader-sides" role="group" aria-label="Menu side">
@@ -19,14 +19,18 @@
       <img id="tablePreview" src="food-paper.webp" alt="" decoding="async" draggable="false">
     </div>
     <div id="tablePaperHits" class="table-paper-hits" aria-label="Read an item" role="group"></div>
-    <button id="readerBack" type="button" class="reader-back" hidden>← Full menu</button>
-    <p id="tableHint" class="table-hint">Hover to peek · Click to read</p>
-    <aside id="readerDetail" class="reader-detail" aria-label="Menu item" hidden>
-      <h2 id="readerName"></h2>
-      <span id="readerPrice"></span>
-      <p id="readerDescription"></p>
-    </aside>
+    <p id="tableHint" class="table-hint">Hover to tilt · Click to read</p>
   </div>
+  <aside id="readerDetail" class="reader-detail" aria-labelledby="readerName" hidden>
+    <button id="readerBack" type="button" class="reader-back">← Full menu</button>
+    <div class="reader-detail-title">
+      <h2 id="readerName" tabindex="-1" aria-describedby="readerPrice readerDescription"></h2>
+      <span id="readerPrice"></span>
+    </div>
+    <p id="readerDescription"></p>
+    <div id="readerArtwork" class="reader-artwork" aria-hidden="true" hidden></div>
+    <ul id="readerEntries" class="reader-entries" hidden></ul>
+  </aside>
 </main>
 <div id="menuFaces"><div id="foodFace"><main><section class="plate" aria-label="Create your plate"><div id="plateTitle" class="title"></div><p class="guide" data-order-only>Tap to choose your protein, two sides and a sauce.</p><div id="proteinTitle" class="step"></div><div id="proteins" class="grid proteins"></div><div id="sideTitle" class="step"></div><div id="sides" class="grid sides"></div><div id="sauceTitle" class="step"></div><div id="sauces" class="grid sauces"></div><div class="plateAction" data-order-only><p id="progress" aria-live="polite">Choose your protein</p><button id="addPlate" disabled>Add plate</button></div></section>
 <section class="other" aria-label="Starters and desserts"><div class="starters"><div id="starterTitle" class="title"></div><div id="starters" class="grid starterGrid"></div></div><div id="sweetTitle" class="title sweetTitle"></div><div id="sweets" class="grid sweetGrid"></div><p class="legend"><b>V</b> VEGETARIAN <b>VG</b> VEGAN <b>GF</b> GLUTEN FREE</p><p class="nut">ALL FOOD OPTIONS CURRENTLY NUT FREE.</p></section></main>
@@ -35,5 +39,5 @@
 <dialog id="order"><div class="dialogHead"><h2>Your order</h2><button id="close" aria-label="Close order">×</button></div><p class="counterNote">Show your selection at the counter to order.</p><div id="lines"></div><div class="sum"><strong>Total</strong><strong id="dialogTotal"></strong></div><button id="done">Back to menu</button></dialog>
 <script src="app.js?v=20261106-3"></script>
 <script src="drinks.js?v=20261106-3"></script>
-<script src="reader.js?v=20261106-3"></script>
+<script src="reader.js?v=20261106-4"></script>
 </body></html>

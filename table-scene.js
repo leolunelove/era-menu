@@ -194,6 +194,7 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
   const viewDirection = new THREE.Vector3();
   const aim = new THREE.Vector3();
   const projected = new THREE.Vector3();
+  const corner = new THREE.Vector3();
   const overviewPaper = new THREE.Matrix4();
   const basePosition = new THREE.Vector3(0, 0.025, 0);
   const baseRotation = new THREE.Quaternion();
@@ -201,7 +202,6 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
   let width = 1;
   let height = 1;
   let side = false;
-  let mode = 'whole';
   let focusBox = null;
   let pose;
   let lastBend;
@@ -230,18 +230,9 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
     if (!focusBox) return full;
     const [x, y, w, h] = focusBox;
     const point = paperPoint(x + w / 2, y + h / 2, new THREE.Vector3());
-    if (mode === 'peek') {
-      return {
-        ...full, x: full.x + point.x * 0.14, y: point.y * 0.14,
-        distance: full.distance * 0.94, lift: 0.095, pitch: 0.07 + point.y * 0.017,
-        lean: -point.x * 0.035, bend: 0.033
-      };
-    }
-    const section = mode === 'section';
     return {
-      ...full, x: point.x, y: point.y - (section ? 0.012 : 0.075),
-      distance: Math.max(0.75, fitDistance(w / ART_WIDTH * SHEET_WIDTH, h / ART_HEIGHT * SHEET_HEIGHT, width < 700 ? .85 : .66, section ? .82 : .65)),
-      elevation: 1.18, azimuth: 0, lift: 0.42, pitch: Math.PI / 2 - 1.18, lean: 0, roll: 0, bend: .014
+      ...full, distance: full.distance * 0.985, lift: 0.035,
+      pitch: 0.035 + point.y * 0.006, lean: -point.x * 0.0125, bend: 0.014
     };
   }
 
@@ -254,6 +245,27 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
     view.position.copy(target).addScaledVector(viewDirection, state.distance);
     view.lookAt(target);
     view.updateMatrixWorld();
+  }
+
+  function keepSheetInFrame(view, sheetMatrix, bend = 0) {
+    const horizontal = HALF_VIEW * view.aspect * (1 - Math.min(0.24, 56 / width));
+    const vertical = HALF_VIEW * (1 - Math.min(0.34, 100 / height));
+    // The box includes the paper's maximum curl and thickness on either face.
+    const halfDepth = SHEET_THICKNESS / 2 + 0.027 + Math.abs(bend);
+    let pullBack = 0;
+    for (const x of [-SHEET_WIDTH / 2, SHEET_WIDTH / 2]) {
+      for (const y of [-SHEET_HEIGHT / 2, SHEET_HEIGHT / 2]) {
+        for (const z of [-halfDepth, halfDepth]) {
+          corner.set(x, y, z).applyMatrix4(sheetMatrix).applyMatrix4(view.matrixWorldInverse);
+          const requiredDepth = Math.max(Math.abs(corner.x) / horizontal, Math.abs(corner.y) / vertical);
+          pullBack = Math.max(pullBack, corner.z + requiredDepth);
+        }
+      }
+    }
+    if (pullBack > 0) {
+      view.position.addScaledVector(viewDirection, pullBack);
+      view.updateMatrixWorld();
+    }
   }
 
   function flex(bend) {
@@ -275,10 +287,12 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
     placement.position.set(0, basePosition.y + state.lift + 2.55 * arc, 0);
     placement.rotation.set(-Math.PI / 2 + state.pitch + .23 * arc, state.lean, state.roll - .08 * arc);
     turntable.rotation.y = state.turn;
-    flex(state.bend + 0.13 * arc);
+    const bend = state.bend + 0.13 * arc;
+    flex(bend);
     placement.updateMatrixWorld(true);
     aim.set(state.x, state.y, 0).applyMatrix4(placement.matrixWorld);
     placeCamera(camera, state, aim);
+    keepSheetInFrame(camera, sheet.matrixWorld, bend);
     paperShadow.material.opacity = .28 - .16 * Math.min(1, state.lift + arc);
     renderer.render(scene, camera);
   }
@@ -332,28 +346,25 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
     overviewPaper.compose(basePosition, baseRotation, unitScale);
     aim.set(home.x, home.y, 0).applyMatrix4(overviewPaper);
     placeCamera(overviewCamera, home, aim);
+    keepSheetInFrame(overviewCamera, overviewPaper);
     if (!transition?.flipping) void move(goal(), 0);
   }
 
-  function projectBox([x, y, w, h], live = false) {
-    const view = live ? camera : overviewCamera;
-    const matrix = live ? placement.matrixWorld : overviewPaper;
+  function projectBox([x, y, w, h]) {
     return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([px, py]) => {
-      paperPoint(px, py, projected).applyMatrix4(matrix).project(view);
+      paperPoint(px, py, projected).applyMatrix4(overviewPaper).project(overviewCamera);
       return [(projected.x + 1) * width / 2, (1 - projected.y) * height / 2];
     });
   }
 
   function focus(nextMode, box = null, immediate = false) {
-    mode = nextMode;
-    focusBox = box;
-    const duration = immediate ? 0 : nextMode === 'peek' ? 320 : 540;
-    return move(goal(), duration);
+    focusBox = nextMode === 'peek' ? box : null;
+    return move(goal(), immediate ? 0 : 280);
   }
 
   async function turn(drinksSide) {
     if (side === drinksSide) return;
-    await focus('whole', null, mode === 'whole');
+    await focus('whole', null, !focusBox);
     await move(wholePose(drinksSide), 680, true);
     side = drinksSide;
     await focus('whole', null, true);
