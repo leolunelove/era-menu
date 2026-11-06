@@ -77,14 +77,15 @@
     if (item) {
       const [, , width, height] = item.entry.box;
       const preview = art(item.entry.box, '', menuArt[sideKey()]);
-      preview.style.maxWidth = `${Math.min(286, 252 * width / height)}px`;
+      preview.style.maxWidth = `${Math.min(240, 190 * width / height)}px`;
       artwork.append(preview);
     }
     updateHint();
     markSection();
     for (const target of targets) {
-      target.button.setAttribute('aria-current', String(target.entry === item?.entry));
+      target.button.setAttribute('aria-expanded', String(target.entry === item?.entry));
     }
+    positionDetail();
   }
 
   function insideSection([x, y, width, height], group) {
@@ -110,6 +111,45 @@
       button.style.height = `${bottom - top}px`;
       button.style.clipPath = `polygon(${points.map(([x, y]) => `${x - left}px ${y - top}px`).join(', ')})`;
     }
+  }
+
+  function positionDetail() {
+    if (detail.hidden) return;
+    const sheetItem = item?.trigger.classList.contains('table-item') ? item : null;
+    const anchor = (sheetItem || section).trigger.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const gap = 12;
+    const left = (viewport?.offsetLeft ?? 0) + gap;
+    const right = left + (viewport?.width ?? document.documentElement.clientWidth) - 2 * gap;
+    const viewportTop = (viewport?.offsetTop ?? 0) + gap;
+    const bottom = viewportTop + (viewport?.height ?? window.innerHeight) - 2 * gap;
+    const top = Math.max(viewportTop, Math.min(rail.getBoundingClientRect().bottom + gap, bottom - 160));
+    detail.style.maxWidth = `${right - left}px`;
+    detail.style.maxHeight = `${bottom - top}px`;
+
+    const panelWidth = detail.offsetWidth;
+    let x = anchor.left + (anchor.width - panelWidth) / 2;
+    let y = anchor.bottom + gap;
+    if (sheetItem) {
+      const clickX = anchor.left + (sheetItem.point?.x ?? 0.5) * anchor.width;
+      const clickY = anchor.top + (sheetItem.point?.y ?? 0.5) * anchor.height;
+      y = clickY - 24;
+      if (anchor.right + gap + panelWidth <= right) {
+        x = anchor.right + gap;
+      } else if (anchor.left - gap - panelWidth >= left) {
+        x = anchor.left - gap - panelWidth;
+      } else {
+        x = clickX - panelWidth / 2;
+        const below = bottom - anchor.bottom - gap;
+        const above = anchor.top - top - gap;
+        const useBelow = below >= above;
+        const space = useBelow ? below : above;
+        if (space >= 148) detail.style.maxHeight = `${Math.min(bottom - top, space)}px`;
+        y = useBelow ? anchor.bottom + gap : anchor.top - gap - detail.offsetHeight;
+      }
+    }
+    detail.style.left = `${Math.max(left, Math.min(x, right - panelWidth))}px`;
+    detail.style.top = `${Math.max(top, Math.min(y, bottom - detail.offsetHeight))}px`;
   }
 
   function renderEntries(group) {
@@ -145,10 +185,18 @@
     openReading();
   }
 
-  function showItem(entry, trigger) {
+  function showItem(entry, trigger, event) {
     if (!scene || busy || flipBusy) return;
     if (section && !insideSection(entry.box, section.group)) section = null;
-    item = { entry, trigger };
+    let point;
+    if (event?.detail) {
+      const bounds = trigger.getBoundingClientRect();
+      point = {
+        x: (event.clientX - bounds.left) / bounds.width,
+        y: (event.clientY - bounds.top) / bounds.height
+      };
+    }
+    item = { entry, trigger, point };
     openReading();
   }
 
@@ -157,7 +205,7 @@
     void scene.focus('whole');
     describe();
     detail.scrollTop = 0;
-    heading.focus();
+    heading.focus({ preventScroll: true });
   }
 
   function backOneLevel() {
@@ -166,7 +214,7 @@
     if (item) item = null;
     else section = null;
     describe();
-    trigger?.focus();
+    trigger?.focus({ preventScroll: !entries.contains(trigger) });
   }
 
   function makeTargets() {
@@ -175,6 +223,7 @@
       button.type = 'button';
       button.className = 'table-item';
       button.setAttribute('aria-label', `Read ${entry.name}${entry.price ? ' ' + money(entry.price) : ''}`);
+      button.setAttribute('aria-controls', detail.id);
       const target = { entry, button };
       button.addEventListener('pointerenter', event => {
         if (!scene || busy || item || section || reducedMenuMotion.matches || event.pointerType !== 'mouse') return;
@@ -186,7 +235,7 @@
         if (!scene || busy || item || section) return;
         returnTimer = setTimeout(() => { void scene.focus('whole'); }, 80);
       });
-      button.addEventListener('click', () => showItem(entry, button));
+      button.addEventListener('click', event => showItem(entry, button, event));
       return target;
     });
     hits.replaceChildren(...targets.map(({ button }) => button));
@@ -241,7 +290,7 @@
     window.scrollTo(0, 0);
     updateHint();
     try {
-      loading ||= import('./table-scene.js?v=20261106-4').then(({ createTableScene }) => createTableScene({
+      loading ||= import('./table-scene.js?v=20261106-5').then(({ createTableScene }) => createTableScene({
         mount: $('tableCanvas'), images: menuArt, motion: reducedMenuMotion, contextLost: unavailable
       }));
       scene = await loading;
@@ -280,6 +329,12 @@
     else showFlat();
   });
   back.addEventListener('click', backOneLevel);
+  document.addEventListener('click', event => {
+    if (detail.hidden || detail.contains(event.target) || event.target.closest?.('.table-item, #readerIndex')) return;
+    item = null;
+    section = null;
+    describe();
+  });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !table.hidden && (item || section)) {
       event.preventDefault();
@@ -289,10 +344,15 @@
   document.addEventListener('era:sidechange', refreshSide);
   finePointer.addEventListener('change', updateHint);
   reducedMenuMotion.addEventListener('change', updateHint);
+  window.addEventListener('scroll', positionDetail, { passive: true });
+  rail.addEventListener('scroll', positionDetail, { passive: true });
+  window.visualViewport?.addEventListener('resize', positionDetail);
+  window.visualViewport?.addEventListener('scroll', positionDetail);
   new ResizeObserver(() => {
     if (!scene || table.hidden) return;
     scene.resize(stage.clientWidth, stage.clientHeight);
     positionTargets();
+    positionDetail();
   }).observe(stage);
 
   refreshSide();

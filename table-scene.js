@@ -5,6 +5,9 @@ const ART_HEIGHT = 1334;
 const SHEET_WIDTH = 5.52;
 const SHEET_HEIGHT = SHEET_WIDTH * ART_HEIGHT / ART_WIDTH;
 const SHEET_THICKNESS = 0.018;
+const TABLE_SURFACE_Y = 0;
+const SHEET_CLEARANCE = 0.006;
+const FLIP_LIFT = SHEET_WIDTH / 2 + 0.26;
 const FIELD_OF_VIEW = 32;
 const HALF_VIEW = Math.tan(THREE.MathUtils.degToRad(FIELD_OF_VIEW / 2));
 
@@ -160,7 +163,7 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
 
   const wood = new THREE.MeshStandardMaterial({ map: walnut, color: 0xead7c1, roughness: 0.64 });
   const table = new THREE.Mesh(new THREE.BoxGeometry(17, 0.22, 13), wood);
-  table.position.set(0, -0.11, -1.9);
+  table.position.set(0, TABLE_SURFACE_Y - 0.11, -1.9);
   table.receiveShadow = true;
   scene.add(table);
 
@@ -282,18 +285,34 @@ export async function createTableScene({ mount, images, motion, contextLost }) {
     geometry.computeVertexNormals();
   }
 
+  function keepSheetAboveTable() {
+    // Measure the deformed underside and edges in world space.
+    const matrix = sheet.matrixWorld.elements;
+    let lowestY = Infinity;
+    for (let i = 0; i < vertices.count; i += 1) {
+      const y = matrix[1] * vertices.getX(i) + matrix[5] * vertices.getY(i) + matrix[9] * vertices.getZ(i) + matrix[13];
+      lowestY = Math.min(lowestY, y);
+    }
+    const correction = TABLE_SURFACE_Y + SHEET_CLEARANCE - lowestY;
+    if (correction > 0) {
+      placement.position.y += correction;
+      placement.updateMatrixWorld(true);
+    }
+  }
+
   function render(arc = 0) {
     const state = { ...pose, distance: pose.distance + 1.15 * arc };
-    placement.position.set(0, basePosition.y + state.lift + 2.55 * arc, 0);
+    placement.position.set(0, basePosition.y + state.lift + FLIP_LIFT * arc, 0);
     placement.rotation.set(-Math.PI / 2 + state.pitch + .23 * arc, state.lean, state.roll - .08 * arc);
     turntable.rotation.y = state.turn;
     const bend = state.bend + 0.13 * arc;
     flex(bend);
     placement.updateMatrixWorld(true);
+    keepSheetAboveTable();
     aim.set(state.x, state.y, 0).applyMatrix4(placement.matrixWorld);
     placeCamera(camera, state, aim);
     keepSheetInFrame(camera, sheet.matrixWorld, bend);
-    paperShadow.material.opacity = .28 - .16 * Math.min(1, state.lift + arc);
+    paperShadow.material.opacity = .28 - .16 * Math.min(1, placement.position.y - basePosition.y);
     renderer.render(scene, camera);
   }
 
